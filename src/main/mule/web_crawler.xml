@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:file="http://www.mulesoft.org/schema/mule/file" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:ms-webcrawler="http://www.mulesoft.org/schema/mule/ms-webcrawler"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ms-aichain="http://www.mulesoft.org/schema/mule/ms-aichain" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ms-aichain http://www.mulesoft.org/schema/mule/ms-aichain/current/mule-ms-aichain.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ms-webcrawler http://www.mulesoft.org/schema/mule/ms-webcrawler/current/mule-ms-webcrawler.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd">
+	<ms-aichain:config name="MuleSoft_AI_Chain_Config" llmType="AZURE_OPENAI" configType="Configuration Json" modelName="gpt-4o-mini" doc:name="MuleSoft AI Chain Config" doc:id="a1d7556a-807b-4a23-bdf1-2fc88a0ced91" filePath='#[mule.home ++ "/apps/" ++ app.name ++ "/envVars.json"]'/>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="23402bdf-b4ad-4cc9-a285-c5cc40bfc389" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<ms-webcrawler:config name="MuleSoft_WebCrawler_Connector_Config" doc:name="MuleSoft WebCrawler Connector Config" doc:id="ffb69eae-e965-47a2-b9aa-26d4193087eb" >
+		<ms-webcrawler:http-connection userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:112.0) Gecko/20100101 Firefox/112.0" referrer="https://www.google.com"/>
+	</ms-webcrawler:config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="92f2f65f-4bfa-481a-b3cb-f71f775e1aa5" >
+		<file:connection workingDir="/Users/sudeshna.biswas/Documents/knowledge_base" />
+	</file:config>
+	<flow name="web_crawlerFlow1" doc:id="70d8ad3b-6b27-4fde-bc50-a27f1d0c06d5" >
+		<http:listener doc:name="Listener" doc:id="cdcd405e-8567-4e85-9146-914f39f6fb4b" config-ref="HTTP_Listener_config" path="/new_store"/>
+		<ms-aichain:embedding-new-store doc:name="Embedding new store" doc:id="5901e56d-e5ab-452e-8b34-78dce65e1a58" storeName='#["/Users/sudeshna.biswas/Documents/knowledge_base/knowledge.store"]'/>
+		<file:write doc:name="Write" doc:id="c745b051-1072-4891-8dc2-29d703b0845d" config-ref="File_Config" path='#["/Users/sudeshna.biswas/Documents/knowledge_base/temp.txt"]'>
+			<file:content ><![CDATA[#[""]]]></file:content>
+		</file:write>
+	</flow>
+	<flow name="web_crawlerFlow" doc:id="7acc13c8-31e7-471b-8aa8-38b5f1059b4d" >
+		<http:listener doc:name="Listener" doc:id="bb3d3bb5-cd09-4240-a0d7-4aa787543dd5" config-ref="HTTP_Listener_config" path="/test"/>
+		<ms-webcrawler:crawl-website-full-scan outputFormat="TEXT" doc:name="[Crawl] Website (Full Scan)" doc:id="c501f4e1-ae25-4028-9c63-57b8783c568d" downloadPath="/Users/sudeshna.biswas/Desktop/Workspace/web_crawler/src/main/resources/downloads/" url="#[payload]" maxDepth="2" regexUrlsFilterLogic="INCLUDE" config-ref="MuleSoft_WebCrawler_Connector_Config"/>
+	</flow>
+	<flow name="web_crawlerFlow2" doc:id="d57e7abf-9430-4743-a414-817721947816" >
+		<file:listener doc:name="On New or Updated File" doc:id="1a584707-0f53-449d-b74b-9c8a27b8a7e9" config-ref="File_Config" directory="/Users/sudeshna.biswas/Desktop/Workspace/web_crawler/src/main/resources/downloads" autoDelete="true">
+			<scheduling-strategy>
+				<fixed-frequency />
+			</scheduling-strategy>
+		</file:listener>
+		<file:read doc:name="Read" doc:id="863b80f1-b63a-4909-98ef-dab661759e7b" path='#["/Users/sudeshna.biswas/Desktop/Workspace/web_crawler/src/main/resources/downloads/" ++ attributes.fileName]' />
+		<file:write doc:name="Write" doc:id="23133bec-3e6d-4f82-93c7-bda8d80710e1" config-ref="File_Config" path='#["/Users/sudeshna.biswas/Documents/knowledge_base/temp.txt"]' mode="APPEND">
+		</file:write>
+		<ms-aichain:embedding-add-document-to-store doc:name="Embedding add document to store" doc:id="02ab5a5b-496c-4ce4-860d-0cc59c171eb8" storeName='#["/Users/sudeshna.biswas/Documents/knowledge_base/knowledge.store"]' contextPath='#["/Users/sudeshna.biswas/Documents/knowledge_base/temp.txt"]' maxSegmentSizeInChars="4000" maxOverlapSizeInChars="0" />
+		<ee:transform doc:name="Transform Message" doc:id="0444f26b-043a-4a21-ac0a-a89f7f9b5339">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="web_crawlerFlow3" doc:id="238be236-575d-4a43-bb62-241f76a341e0" >
+		<http:listener doc:name="Listener" doc:id="74b2d266-2749-48cc-a8ec-a0bc5b721a5c" config-ref="HTTP_Listener_config" path="/ask" />
+		<ms-aichain:embedding-get-info-from-store doc:name="Embedding get info from store" doc:id="5944d55c-ec6d-4bca-9a8e-ddad9ad8c51d" config-ref="MuleSoft_AI_Chain_Config" storeName='#["/Users/sudeshna.biswas/Documents/knowledge_base/knowledge.store"]'>
+			<ms-aichain:data ><![CDATA[#[payload ++ ". Instructions: Please base your answer on the information that you have in the knowledge store. Do not invent things."]]]></ms-aichain:data>
+		</ms-aichain:embedding-get-info-from-store>
+		<ee:transform doc:name="Transform Message" doc:id="7fc52f71-2528-47b2-a1e5-ecd83b954de3">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload.response]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
